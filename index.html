@@ -57,6 +57,8 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; marg
 .floater { position: sticky; top: 0; height: 100vh; height: 100svh; margin-bottom: -100vh; margin-bottom: -100svh; z-index: 0; pointer-events: none; overflow: hidden; background: var(--ground) url(frames/f_0001.webp) center / cover no-repeat; }
 .floater.live { background-image: none; }
 .floater canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#crisp { opacity: 0; }
+#crisp.on { opacity: 1; transition: opacity .24s linear; }
 .scrim { position: absolute; inset: 0; opacity: 0; }
 .scrim.l { background: linear-gradient(to right, color-mix(in srgb, var(--ground) 90%, transparent) 0%, color-mix(in srgb, var(--ground) 62%, transparent) 30%, transparent 62%); opacity: 1; }
 .scrim.r { background: linear-gradient(to left, color-mix(in srgb, var(--ground) 90%, transparent) 0%, color-mix(in srgb, var(--ground) 62%, transparent) 30%, transparent 62%); }
@@ -172,6 +174,7 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
 
   <div class="floater" id="floater">
     <canvas id="film" role="img" aria-label="Film: a coffee cherry is picked, pulped, dried, roasted, ground and brewed into a cup of coffee"></canvas>
+    <canvas id="crisp" aria-hidden="true"></canvas>
     <div class="scrim l" id="sl"></div><div class="scrim r" id="sr"></div><div class="scrim b" id="sb"></div>
     <div class="readout" id="readout" aria-hidden="true"><span class="k"></span><span class="v"></span><i class="flag"></i></div>
     <div class="loading" id="loading">Loading film 0%</div>
@@ -365,6 +368,10 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
   const journey = document.getElementById('journey'), floater = document.getElementById('floater');
   const canvas = document.getElementById('film'), ctx = canvas.getContext('2d');
   const oc = document.createElement('canvas'), octx = oc.getContext('2d');
+  const crisp = document.getElementById('crisp'), occ = document.createElement('canvas');
+  /* the two drawing targets: TM plays the film while the page moves, TC holds the full-size picture shown at rest */
+  const TM = { c: canvas, ctx, oc, octx, dpr: 1, q: 'medium', opaque: false }, TC = { c: crisp, ctx: crisp.getContext('2d'), oc: occ, octx: occ.getContext('2d'), dpr: 1, q: 'high', opaque: true };
+  const GROUND = getComputedStyle(document.documentElement).getPropertyValue('--ground').trim() || '#030202';
   const heroB = document.getElementById('b-hero'), finB = document.getElementById('b-fin'), chB = [...journey.querySelectorAll('.block.ch')];
   const loading = document.getElementById('loading'), readout = document.getElementById('readout');
   const rk = readout.querySelector('.k'), rv = readout.querySelector('.v'), rf = readout.querySelector('.flag');
@@ -372,18 +379,28 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
   const svg = document.getElementById('trail'), tp0 = document.getElementById('tp0'), tp1 = document.getElementById('tp1'), tcr = document.getElementById('tcr'), tg = document.getElementById('tg');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches, narrow = matchMedia('(max-width: 760px)');
 
-  /* ---- frames: load the ones nearest the current position first ---- */
-  const imgs = new Array(N), asked = new Uint8Array(N);
-  let loaded = 0, want = 0, inFlight = 0, last = null;
-  const url = i => `frames/f_${String(i + 1).padStart(4, '0')}.webp`;
-  function nextIndex() { for (let d = 0; d < N; d++) { const a = want + d, b = want - d; if (a < N && !asked[a]) return a; if (b >= 0 && !asked[b]) return b; } return -1; }
+  /* ---- frames ----
+     Two sets of the same 480 pictures. The light set (frames_m, 960 px wide) is what plays while the page moves: small enough to
+     arrive in a few seconds and cheap enough to draw on every screen refresh. The full-size set (frames) is fetched one picture at
+     a time, for the frame the scroll comes to rest on, and faded in over the light one. */
+  const imgs = new Array(N), asked = new Uint8Array(N), retried = new Uint8Array(N);
+  let loaded = 0, want = 0, inFlight = 0, last = null, light = true, ready = false;
+  const pad4 = i => String(i + 1).padStart(4, '0');
+  const url = i => light ? `frames_m/f_${pad4(i)}.avif` : `frames/f_${pad4(i)}.webp`, urlFull = i => `frames/f_${pad4(i)}.webp`;
+  function nextIndex() {
+    for (let d = 0; d <= 40; d++) { const a = want + d, b = want - d; if (a < N && !asked[a]) return a; if (b >= 0 && !asked[b]) return b; }                          // what is about to be shown
+    for (let d = 0; d < N; d++) { const a = want + d, b = want - d; if (a < N && a % 4 === 0 && !asked[a]) return a; if (b >= 0 && b % 4 === 0 && !asked[b]) return b; }  // then every fourth frame of the whole film
+    for (let d = 0; d < N; d++) { const a = want + d, b = want - d; if (a < N && !asked[a]) return a; if (b >= 0 && !asked[b]) return b; }                             // then the rest
+    return -1;
+  }
   function pump() {
+    if (!ready) return;
     while (inFlight < 8) {
       const i = nextIndex(); if (i < 0) return;
       asked[i] = 1; inFlight++;
       const im = new Image(); im.decoding = 'async';
-      im.onload = () => { imgs[i] = im; loaded++; inFlight--; loading.textContent = `Loading film ${Math.round(loaded / N * 100)}%`; if (loaded >= N) loading.classList.add('done'); if (last && Math.abs(i - want) < 24) decodeWindow(); if (last && !bm.size && Math.abs(i - want) < 4) render(last); pump(); };
-      im.onerror = () => { inFlight--; pump(); };
+      im.onload = () => { imgs[i] = im; loaded++; inFlight--; loading.textContent = `Loading film ${Math.round(loaded / N * 100)}%`; if (loaded >= N) loading.classList.add('done'); if (last && Math.abs(i - want) < 48) decodeWindow(); if (last && !bm.size && Math.abs(i - want) < 4) drawMotion(last, settled); pump(); };
+      im.onerror = () => { inFlight--; if (!retried[i]) { retried[i] = 1; asked[i] = 0; } setTimeout(pump, 400); };
       im.src = url(i);
     }
   }
@@ -408,8 +425,8 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
       fX: [vh / 2, ...chB.map(bot), mid(finB)], fY: [1, ...ENDS, N],
       g0: bot(chB[5]), g1: mid(finB),
       dpr: clamp(Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(4.4e6 / (vw * vh))), 1, 2) };
-    const cw = Math.round(vw * M.dpr), ch = Math.round(vh * M.dpr);
-    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = oc.width = cw; canvas.height = oc.height = ch; }
+    TC.dpr = M.dpr; TM.dpr = Math.min(M.dpr, Math.max(1, Math.sqrt(1.7e6 / (vw * vh))));       // the moving canvas stays light; the resting one is full resolution
+    for (const T of [TM, TC]) { const cw = Math.round(vw * T.dpr), ch = Math.round(vh * T.dpr); if (T.c.width !== cw || T.c.height !== ch) { T.c.width = T.oc.width = cw; T.c.height = T.oc.height = ch; } }
     if (!mobile) buildTrail();
   }
   function at(s) {                               // s = pixels scrolled into the journey
@@ -427,46 +444,81 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
     const cs = getComputedStyle(document.documentElement);
     tg.innerHTML = chB.map((el, i) => `<stop offset="${((el.offsetTop + el.offsetHeight / 2) / M.H).toFixed(4)}" stop-color="${cs.getPropertyValue(COLORS[i]).trim()}"/>`).join('');
   }
-  /* ---- frames near the current one are decoded ahead of time, so drawing never has to wait ---- */
-  const bm = new Map(), pend = new Set(); let dir = 1, lastWant = 0;
+  /* ---- light frames near the current one are decoded ahead of time, so drawing never has to wait ---- */
+  const bm = new Map(), pend = new Set(); let dir = 1, lastWant = 0, drawn = false;
+  function queue(i, lo, hi, keep) {
+    if (i < lo || i > hi || i < 0 || i >= N || !imgs[i] || bm.has(i) || pend.has(i)) return;
+    pend.add(i);
+    createImageBitmap(imgs[i]).then(b => { pend.delete(i); if (Math.abs(i - want) > keep) { b.close(); return; } bm.set(i, b); if (last && Math.abs(i - want) < 2) drawMotion(last, settled); }).catch(() => pend.delete(i));
+  }
   function decodeWindow() {
     if (!window.createImageBitmap || !M) return;
-    const back = dir > 0 ? 8 : 20, fwd = dir > 0 ? 20 : 8;
-    for (let i = Math.max(0, want - back); i <= Math.min(N - 1, want + fwd); i++) {
-      if (!imgs[i] || bm.has(i) || pend.has(i)) continue;
-      pend.add(i);
-      (M.mobile ? createImageBitmap(imgs[i], { resizeWidth: 960, resizeHeight: 540, resizeQuality: 'high' }) : createImageBitmap(imgs[i]))
-        .then(b => { pend.delete(i); if (Math.abs(i - want) > 34) { b.close(); return; } bm.set(i, b); if (last && Math.abs(i - want) < 3) render(last); })
-        .catch(() => pend.delete(i));
-    }
-    for (const [k, b] of bm) if (k < want - 34 || k > want + 34) { b.close(); bm.delete(k); }
+    const big = !light, near = big ? 8 : M.mobile ? 6 : 16, far = big ? 20 : M.mobile ? 18 : 40, lo = want - (dir > 0 ? near : far), hi = want + (dir > 0 ? far : near), keep = far + 8;
+    for (let d = 0; d <= far; d++) { queue(want + dir * d, lo, hi, keep); if (d) queue(want - dir * d, lo, hi, keep); }
+    for (const [k, b] of bm) if (k < lo - 8 || k > hi + 8) { b.close(); bm.delete(k); }
   }
-  function source() {
-    for (let d = 0; d <= 6; d++) { if (bm.has(want - d)) return bm.get(want - d); if (bm.has(want + d)) return bm.get(want + d); }
-    const i = nearest(want); return i < 0 ? null : imgs[i];
-  }
-  /* ---- one frame, drawn as a full scene, as a lone subject, or part-way between ----
+  function bmNear(i, span) { for (let d = 0; d <= span; d++) { if (bm.has(i - d)) return bm.get(i - d); if (bm.has(i + d)) return bm.get(i + d); } return null; }
+
+  /* ---- one picture, drawn as a full scene, as a lone subject, or part-way between ----
      The subject first grows into the scene's own position, and only then does the rest of the scene fade in around it,
-     so wherever the scroll stops there is one clean picture, never two overlapping ones. */
-  function render(st) {
-    const im = source(); if (!im) return;
+     so wherever the scroll stops there is one clean picture, never two overlapping ones. T is the canvas being drawn to. */
+  function render(st, im, T) {
     floater.classList.add('live');
-    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, { vw, vh, dpr } = M, e = st.e, eg = st.eg;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, vw, vh);
+    const c = T.ctx, o = T.octx, dpr = T.dpr, iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, { vw, vh } = M, e = st.e, eg = st.eg;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.imageSmoothingQuality = T.q;
+    if (T.opaque) { c.fillStyle = GROUND; c.fillRect(0, 0, vw, vh); } else c.clearRect(0, 0, vw, vh);
     const scS = Math.max(vw / iw, vh / ih), aS = smooth((e - 0.5) / 0.5);
-    if (aS > 0.002) { ctx.globalAlpha = aS; ctx.drawImage(im, (vw - iw * scS) / 2, (vh - ih * scS) / 2, iw * scS, ih * scS); ctx.globalAlpha = 1; }
+    if (aS > 0.002) { c.globalAlpha = aS; c.drawImage(im, (vw - iw * scS) / 2, (vh - ih * scS) / 2, iw * scS, ih * scS); c.globalAlpha = 1; }
     if (aS < 0.998) {
       const scO = M.hObj / ih, sc = scO * Math.pow(scS / scO, eg);
       const ax = lerp(st.cx, 0.5, eg), ay = lerp(st.cy, 0.5, eg), tx = vw / 2 + st.x, ty = lerp(M.yObj, vh / 2, eg);
       const r1 = lerp(st.rm, 0.485, eg) * ih * sc, r0 = r1 * 0.5;
-      octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.globalCompositeOperation = 'source-over'; octx.clearRect(0, 0, vw, vh);
-      octx.drawImage(im, tx - ax * iw * sc, ty - ay * ih * sc, iw * sc, ih * sc);
-      const gr = octx.createRadialGradient(tx, ty, r0, tx, ty, r1);
+      o.setTransform(dpr, 0, 0, dpr, 0, 0); o.globalCompositeOperation = 'source-over'; o.imageSmoothingQuality = T.q; o.clearRect(0, 0, vw, vh);
+      o.drawImage(im, tx - ax * iw * sc, ty - ay * ih * sc, iw * sc, ih * sc);
+      const gr = o.createRadialGradient(tx, ty, r0, tx, ty, r1);
       gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.35, 'rgba(0,0,0,0.84)'); gr.addColorStop(0.65, 'rgba(0,0,0,0.42)'); gr.addColorStop(0.86, 'rgba(0,0,0,0.11)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      octx.globalCompositeOperation = 'destination-in'; octx.fillStyle = gr; octx.fillRect(0, 0, vw, vh);
-      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(oc, 0, 0);
+      o.globalCompositeOperation = 'destination-in'; o.fillStyle = gr; o.fillRect(0, 0, vw, vh);
+      c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(T.oc, 0, 0);
     }
   }
+  /* ---- while moving: the two light frames either side of the exact position, blended, so slow scrolling glides instead of stepping.
+          At rest (single = true): one frame only, never a blend. ---- */
+  const mix = document.createElement('canvas'), mctx = mix.getContext('2d');
+  function drawMotion(st, single) {
+    const fpos = clamp(st.f - 1, 0, N - 1), i0 = Math.floor(fpos), fr = fpos - i0;
+    let im = null;
+    if (!single && fr > 0.03 && fr < 0.97 && bm.has(i0) && bm.has(i0 + 1)) {
+      const a = bm.get(i0), b = bm.get(i0 + 1);
+      if (mix.width !== a.width || mix.height !== a.height) { mix.width = a.width; mix.height = a.height; }
+      mctx.globalAlpha = 1; mctx.drawImage(a, 0, 0); mctx.globalAlpha = smooth(fr); mctx.drawImage(b, 0, 0); im = mix;
+    } else {
+      im = bmNear(want, 10);
+      if (!im) { const j = nearest(want); if (j >= 0) im = imgs[j]; }
+    }
+    if (im) { render(st, im, TM); drawn = true; }
+  }
+  /* ---- at rest: the full-size picture for the frame we stopped on, faded in over the light one ---- */
+  const full = new Map(), fullPend = new Set();
+  let settled = false, settleT = 0, crispOn = false, tgt = -1, tgtAt = 0;
+  function needFull(i, force) {
+    if (full.has(i) || fullPend.has(i) || (!force && fullPend.size >= 1)) return;
+    fullPend.add(i);
+    const im = new Image(); im.decoding = 'async';
+    im.onload = () => (window.createImageBitmap ? createImageBitmap(im) : Promise.resolve(im)).then(b => {
+      fullPend.delete(i); full.set(i, b);
+      for (const [k, v] of full) { if (full.size <= 6) break; if (k !== i && k !== want) { if (v.close) v.close(); full.delete(k); } }
+      if (settled && want === i) showCrisp();
+    }).catch(() => fullPend.delete(i));
+    im.onerror = () => fullPend.delete(i);
+    im.src = urlFull(i);
+  }
+  function showCrisp() {
+    if (!settled || !last) return;
+    const b = full.get(want) || (!light && bm.get(want)); if (!b) { needFull(want, true); return; }
+    render(last, b, TC); crisp.classList.add('on'); crispOn = true;
+  }
+  function settle() { settled = true; if (!last) return; drawMotion(last, true); showCrisp(); }
+  function moving() { settled = false; if (crispOn) { crisp.classList.remove('on'); crispOn = false; } clearTimeout(settleT); settleT = setTimeout(settle, 110); }
   function info(f) {
     if (f <= 80) return ['Harvest', 'Ripe only', ''];
     if (f <= 150) return ['Pulping', 'Fruit off, bean out', ''];
@@ -477,12 +529,16 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
   }
   function apply(p) {
     if (!M) return;
+    /* where the page itself has got to (the film eases towards it): once that stops changing, fetch its full-size frame early */
+    const now = performance.now(), tw = clamp(Math.round(at(scrollP() * M.span).f) - 1, 0, N - 1);
+    if (tw !== tgt) { tgt = tw; tgtAt = now; } else if (now - tgtAt > 100 && loaded >= N) needFull(tw);
     const s = clamp(p, 0, 1) * M.span, st = at(s), f = Math.round(st.f);
-    last = st; want = clamp(f - 1, 0, N - 1); dir = Math.sign(want - lastWant) || dir; lastWant = want; render(st); decodeWindow(); pump();
+    last = st; want = clamp(f - 1, 0, N - 1); dir = Math.sign(want - lastWant) || dir; lastWant = want;
+    moving(); drawMotion(st, false); decodeWindow(); pump();
     const wL = (1 + st.S) / 2;
     if (M.mobile) { sl.style.opacity = 0; sr.style.opacity = 0; sb.style.opacity = st.e.toFixed(3); }
     else { sl.style.opacity = (st.e * wL * (1 - st.g)).toFixed(3); sr.style.opacity = (st.e * (1 - wL) * (1 - st.g)).toFixed(3); sb.style.opacity = (st.e * st.g).toFixed(3);
-      readout.style.opacity = (1 - st.g).toFixed(3); svg.style.opacity = (1 - st.e).toFixed(3); tcr.setAttribute('height', (s + M.yObj).toFixed(1)); }
+      readout.style.opacity = (1 - st.g).toFixed(3); svg.style.opacity = (1 - st.e).toFixed(3); if (st.e < 0.999) tcr.setAttribute('height', (s + M.yObj).toFixed(1)); }
     const [k, v, flag] = info(f); if (rk.textContent !== k) rk.textContent = k; if (rv.textContent !== v) rv.textContent = v; if (rf.textContent !== flag) rf.textContent = flag;
   }
   const scrollP = () => clamp(-journey.getBoundingClientRect().top / M.span, 0, 1);
@@ -493,15 +549,26 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
     gsap.registerPlugin(ScrollTrigger);
     const st = { p: 0 }; cur = () => st.p;
     gsap.to(st, { p: 1, ease: 'none', onUpdate: () => apply(st.p),
-      scrollTrigger: { trigger: journey, start: 'top top', end: 'bottom bottom', scrub: reduced ? true : 0.3, invalidateOnRefresh: true } });
+      scrollTrigger: { trigger: journey, start: 'top top', end: 'bottom bottom', scrub: reduced ? true : 0.55, invalidateOnRefresh: true } });
     if (!reduced) gsap.from('.hero .copy > *', { y: 24, opacity: 0, duration: 1.1, ease: 'power3.out', stagger: 0.12, delay: 0.15 });
   } else {
-    let tick = false;
-    addEventListener('scroll', () => { if (!tick) { tick = true; requestAnimationFrame(() => { tick = false; apply(scrollP()); }); } }, { passive: true });
+    /* no GSAP: the same glide, done by hand */
+    let p = scrollP(), raf = 0, tPrev = 0; cur = () => p;
+    const step = t => {
+      const target = scrollP(), dt = Math.min((t - tPrev) / 1000, 0.05); tPrev = t;
+      p = reduced || Math.abs(target - p) * M.span < 0.6 ? target : p + (target - p) * (1 - Math.exp(-dt / 0.12));
+      apply(p); raf = p === target ? 0 : requestAnimationFrame(step);
+    };
+    addEventListener('scroll', () => { if (!raf) { tPrev = performance.now(); raf = requestAnimationFrame(step); } }, { passive: true });
   }
   let rz = 0;
   new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { layout(); apply(cur()); }); }).observe(journey);
   apply(scrollP());
+  /* the light set is AVIF; a browser that cannot show it plays the full-size set instead */
+  const probe = new Image();
+  probe.onload = () => { ready = true; pump(); };
+  probe.onerror = () => { light = false; ready = true; pump(); };
+  probe.src = url(0);
 })();
 </script>
 
