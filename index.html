@@ -1,0 +1,489 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>The Bean Trail</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: the film is the page itself. In the three full scenes it fills the screen edge to edge; in the object shots it
+   closes down to the subject alone, which floats on black and swings right, left, right along an S as you scroll. */
+:root {
+  color-scheme: dark;
+  --ground: #030202;        /* matches the film's own black, so the orb has no visible edge */
+  --raise: #110d0a;
+  --ink: #faf7f2;
+  --muted: #b9ae9d;
+  --rule: #2e251d;
+  --orange: #fd6b3c;
+  --orange-deep: #c85a2a;
+  --tan: #d6ab92;
+  /* the bean's own colour at each stage */
+  --st-cherry: #c22a20;
+  --st-pulp: #d3d6b6;
+  --st-dry: #a8b08d;
+  --st-roast: #c8741f;
+  --st-grind: #8a5a38;
+  --st-brew: #d6a05c;
+  --sans: "Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif;
+  --gutter: clamp(16px, 5vw, 64px);
+  --radius: 8px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); font-weight: 500; font-size: 1rem; line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; margin: 0; }
+.eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); margin: 0 0 0.9rem; }
+.btn { display: inline-block; padding: 12px 26px; border-radius: var(--radius); border: 1px solid transparent; text-decoration: none; font: 500 0.9375rem/1.25 var(--sans); cursor: pointer; transition: background-color .2s, border-color .2s; }
+.btn.warm { background: var(--orange-deep); border-color: var(--orange-deep); color: var(--ink); }
+.btn.warm:hover { background: var(--orange); border-color: var(--orange); color: var(--ground); }
+.btn.line { border-color: color-mix(in srgb, var(--ink) 40%, transparent); color: var(--ink); }
+.btn.line:hover { border-color: var(--ink); }
+.ph { border-bottom: 1px dashed currentColor; opacity: 0.75; }
+
+.top { position: fixed; inset: 0 0 auto 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) var(--gutter) 26px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--ground) 92%, transparent) 40%, transparent); pointer-events: none; }
+.top > * { pointer-events: auto; }
+.wordmark { display: inline-flex; align-items: center; color: var(--orange); font-weight: 500; font-size: 1.3rem; letter-spacing: 0.3em; text-transform: lowercase; text-decoration: none; }
+.wordmark img { display: block; height: 30px; width: auto; }
+.top nav { display: flex; gap: clamp(14px, 3vw, 34px); font-size: 0.875rem; }
+.top nav a { text-decoration: none; opacity: 0.8; transition: opacity .2s; }
+.top nav a:hover { opacity: 1; }
+
+/* ---------- the trail ---------- */
+.journey { position: relative; overflow: clip; }
+.pair, .voices, .faq, footer { position: relative; z-index: 2; }
+.pair, .voices, .faq { background: var(--ground); }
+.pair.alt { background: var(--raise); }
+.trail { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: visible; opacity: 0; }
+.floater { position: sticky; top: 0; height: 100vh; height: 100svh; margin-bottom: -100vh; margin-bottom: -100svh; z-index: 0; pointer-events: none; overflow: hidden; background: var(--ground) url(frames/f_0001.webp) center / cover no-repeat; }
+.floater.live { background-image: none; }
+.floater canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.scrim { position: absolute; inset: 0; opacity: 0; }
+.scrim.l { background: linear-gradient(to right, color-mix(in srgb, var(--ground) 90%, transparent) 0%, color-mix(in srgb, var(--ground) 62%, transparent) 30%, transparent 62%); opacity: 1; }
+.scrim.r { background: linear-gradient(to left, color-mix(in srgb, var(--ground) 90%, transparent) 0%, color-mix(in srgb, var(--ground) 62%, transparent) 30%, transparent 62%); }
+.scrim.b { background: linear-gradient(to top, color-mix(in srgb, var(--ground) 94%, transparent) 0%, color-mix(in srgb, var(--ground) 60%, transparent) 30%, transparent 58%); }
+.readout { position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: baseline; gap: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.readout .k { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.readout .v { font-size: 1.05rem; font-weight: 600; }
+.readout .flag { font-style: normal; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); }
+.loading { position: absolute; right: var(--gutter); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); transition: opacity .6s; }
+.loading.done { opacity: 0; }
+
+.block { position: relative; z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; padding-inline: var(--gutter); min-height: var(--h, 100vh); }
+.copy { min-width: 0; max-width: 30rem; }
+.textL .copy { grid-column: 1; }
+.textR .copy { grid-column: 2; justify-self: end; }
+.hero { --h: 92vh; }
+.hero h1 { font-size: clamp(2.7rem, 6.6vw, 5.4rem); line-height: 0.98; letter-spacing: -0.03em; margin-bottom: 0.4em; }
+.hero p { margin: 0; color: var(--muted); }
+.cue { display: inline-flex; align-items: center; gap: 10px; margin-top: 1.5rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.cue i { display: block; width: 1px; height: 34px; background: var(--ink); transform-origin: top; animation: drip 1.9s ease-in-out infinite; }
+@keyframes drip { 0% { transform: scaleY(0); } 55% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+.idx { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.9rem; }
+.idx b { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.ch h2 { font-size: clamp(2rem, 4.2vw, 3.4rem); line-height: 1.02; letter-spacing: -0.03em; margin-bottom: 0.45em; }
+.ch p { margin: 0; color: var(--muted); }
+.tie { margin-top: 2rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); display: grid; gap: 14px; }
+.tie h3 { font-size: 1.35rem; line-height: 1.12; margin-bottom: 0.35em; text-transform: lowercase; }
+.tie p { font-size: 0.9375rem; margin-bottom: 0.9rem; }
+.tie .tan { color: var(--tan); text-transform: none; }
+.finale { --h: 108vh; grid-template-columns: minmax(0, 1fr); align-items: end; justify-items: center; text-align: center; padding-bottom: clamp(40px, 9vh, 96px); }
+.finale .copy { max-width: 40rem; }
+.finale h2 { font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.05; text-transform: lowercase; margin-bottom: 0.5em; }
+.finale p { margin: 0 0 1.4rem; color: var(--muted); }
+.finale .row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+
+/* ---------- after the trail ---------- */
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: var(--gutter); }
+section[id], article[id] { scroll-margin-top: 72px; }
+.pair { padding-block: clamp(64px, 9vw, 120px); }
+.pair .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 6vw, 88px); align-items: center; }
+.pair.flip .shot { order: 2; }
+.shot { margin: 0; min-width: 0; }
+.shot img { display: block; width: 100%; height: auto; max-width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--radius); background: var(--raise); }
+.shot img[data-slot="subscription"] { aspect-ratio: 10 / 11; object-position: 50% 82%; }
+.pair h2 { font-size: clamp(1.9rem, 3.8vw, 2.9rem); line-height: 1.05; text-transform: lowercase; margin-bottom: 0.6em; }
+.pair p { margin: 0 0 1.6rem; color: var(--muted); max-width: 30rem; }
+.voices { padding-block: clamp(56px, 8vw, 104px); text-align: center; }
+.voices h2 { font-size: clamp(2rem, 4.4vw, 3rem); line-height: 1.05; text-transform: lowercase; margin-bottom: 1.4rem; }
+.slot { margin: 0 auto; max-width: 40rem; padding: 28px 24px; border: 1px dashed var(--muted); border-radius: var(--radius); color: var(--muted); font-size: 0.9375rem; }
+.faq { padding-block: clamp(56px, 9vw, 112px); }
+.faq .wrap { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: clamp(32px, 6vw, 88px); align-items: start; }
+.faq h2 { font-size: clamp(2rem, 4.4vw, 3rem); line-height: 1; margin-bottom: 1.4rem; }
+.faq details { border-bottom: 1px solid var(--rule); }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 0; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-size: 1.35rem; line-height: 1; transition: transform .2s; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { margin: 0 0 18px; color: var(--muted); }
+.help h3 { font-size: clamp(1.6rem, 3vw, 2rem); line-height: 1.05; margin-bottom: 0.6em; }
+.help p { margin: 0 0 1.2rem; color: var(--muted); font-size: 0.9375rem; }
+.help ul { list-style: none; margin: 1.4rem 0 0; padding: 0; display: grid; gap: 8px; font-size: 0.9375rem; overflow-wrap: anywhere; }
+footer { background: var(--raise); padding-block: clamp(48px, 7vw, 80px) calc(28px + env(safe-area-inset-bottom, 0px)); }
+footer .cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 4fr); gap: clamp(28px, 4vw, 56px); }
+footer h3 { font-size: 1.5rem; line-height: 1.1; margin-bottom: 0.8rem; }
+footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 0.9375rem; }
+footer ul a { text-decoration: none; opacity: 0.8; }
+footer ul a:hover { opacity: 1; }
+footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
+.news { display: flex; margin-top: 1rem; max-width: 24rem; }
+.news input { flex: 1 1 0; min-width: 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--ink) 40%, transparent); border-right: 0; border-radius: var(--radius) 0 0 var(--radius); background: transparent; color: var(--ink); font: 500 0.9375rem var(--sans); }
+.news input::placeholder { color: color-mix(in srgb, var(--ink) 55%, transparent); }
+.news button { border-radius: 0 var(--radius) var(--radius) 0; }
+.news-note { min-height: 1.4em; margin: 8px 0 0; font-size: 0.8125rem; color: var(--muted); }
+.fine { margin-top: clamp(36px, 5vw, 64px); padding-top: 20px; border-top: 1px solid var(--rule); display: grid; gap: 6px; font-size: 0.75rem; color: var(--muted); }
+.fine p { margin: 0; max-width: 60rem; }
+
+@media (max-width: 860px) { footer .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .top nav a:not(.keep) { display: none; }
+  .trail { display: none; }
+  .block { grid-template-columns: minmax(0, 1fr); min-height: var(--h, 100vh); }
+  .ch .copy, .hero .copy { transform: translateY(19vh); }
+  .textR .copy { grid-column: 1; justify-self: start; }
+  .readout { left: auto; right: var(--gutter); bottom: auto; top: calc(60px + env(safe-area-inset-top, 0px)); transform: none; gap: 8px; }
+  .loading { right: auto; left: var(--gutter); }
+  .faq .wrap, .pair .wrap { grid-template-columns: minmax(0, 1fr); }
+  .pair.flip .shot { order: 0; }
+}
+@media (max-width: 520px) { footer .cols { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .cue i { animation: none; } }
+</style>
+</head><body>
+<header class="top">
+  <a class="wordmark" href="#journey"><span data-shop="name">your roastery</span></a>
+  <nav aria-label="Sections">
+    <a href="#coffee">Coffee</a>
+    <a href="#roastery">Roastery</a>
+    <a href="#subscribe">Subscribe</a>
+    <a class="keep" href="#help">Contact</a>
+  </nav>
+</header>
+
+<main>
+<section class="journey" id="journey" aria-label="The journey of one coffee bean, from cherry to cup">
+  <svg class="trail" id="trail" aria-hidden="true" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="tg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"></linearGradient>
+      <clipPath id="tc"><rect id="tcr" x="0" y="0" width="100" height="0"></rect></clipPath>
+    </defs>
+    <path id="tp0" fill="none" stroke="url(#tg)" stroke-width="1.5" stroke-dasharray="2 9" stroke-linecap="round" opacity="0.4"></path>
+    <path id="tp1" fill="none" stroke="url(#tg)" stroke-width="2" stroke-linecap="round" clip-path="url(#tc)"></path>
+  </svg>
+
+  <div class="floater" id="floater">
+    <canvas id="film" role="img" aria-label="Film: a coffee cherry is picked, pulped, dried, roasted, ground and brewed into a cup of coffee"></canvas>
+    <div class="scrim l" id="sl"></div><div class="scrim r" id="sr"></div><div class="scrim b" id="sb"></div>
+    <div class="readout" id="readout" aria-hidden="true"><span class="k"></span><span class="v"></span><i class="flag"></i></div>
+    <div class="loading" id="loading">Loading film 0%</div>
+  </div>
+
+  <div class="block hero textL" id="b-hero">
+    <div class="copy">
+      <h1>from cherry to cup.</h1>
+      <p>Follow one coffee bean the whole way down the page: off the branch, out of the fruit, through the roaster and into your cup.</p>
+      <span class="cue"><i></i>Scroll to follow it</span>
+    </div>
+  </div>
+
+  <article class="block ch textL" id="story" style="--h: 118vh; --c: var(--st-cherry)">
+    <div class="copy">
+      <div class="idx"><b></b>01 / Cherry</div>
+      <h2>it starts as a fruit.</h2>
+      <p>A coffee bean is the seed of a cherry. It is picked when the skin has turned deep red and the fruit comes away with a light pull.</p>
+      <div class="tie">
+        <h3 class="tan"><span class="ph">Where your coffee comes from, in one line.</span></h3>
+        <p><span class="ph">Tell the sourcing story here: the regions and farms you buy from and how each lot is chosen.</span></p>
+      </div>
+    </div>
+  </article>
+
+  <article class="block ch textR" style="--h: 100vh; --c: var(--st-pulp)">
+    <div class="copy">
+      <div class="idx"><b></b>02 / Pulping</div>
+      <h2>the fruit comes off.</h2>
+      <p>Squeezed, the skin splits and the bean slips out, still wet with a thin coat of sweet pulp.</p>
+    </div>
+  </article>
+
+  <article class="block ch textL" style="--h: 92vh; --c: var(--st-dry)">
+    <div class="copy">
+      <div class="idx"><b></b>03 / Drying</div>
+      <h2>then it waits.</h2>
+      <p>Spread out and turned for days, until it holds about 11% water. Dry, it keeps. Dry, it can travel.</p>
+    </div>
+  </article>
+
+  <article class="block ch textR" id="roastery" style="--h: 150vh; --c: var(--st-roast)">
+    <div class="copy">
+      <div class="idx"><b></b>04 / Roasting</div>
+      <h2>heat does the rest.</h2>
+      <p>In the drum the bean browns, swells and cracks open at around 196 °C. Everything you taste later is made in these few minutes.</p>
+      <div class="tie">
+        <h3>come in and watch it roast</h3>
+        <p><span class="ph">Invite people to your roastery: what they can see, taste and ask before they buy.</span></p>
+        <div><a class="btn warm" href="#help">Visit us</a></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="block ch textL" style="--h: 112vh; --c: var(--st-grind)">
+    <div class="copy">
+      <div class="idx"><b></b>05 / Grinding</div>
+      <h2>broken open.</h2>
+      <p>Ground moments before brewing, so the aroma ends up in the cup and not in the air.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="block ch textR" style="--h: 140vh; --c: var(--st-brew)">
+    <div class="copy">
+      <div class="idx"><b></b>06 / Brewing</div>
+      <h2>and then, a cup.</h2>
+      <p>Hot water, nine bars of pressure, under half a minute. The crema on top is the last thing the bean gives up.</p>
+      </div>
+    </div>
+  </article>
+
+  <div class="block finale" id="b-fin">
+    <div class="copy">
+      <h2>that is the whole journey.</h2>
+      <p>Now come and taste where it ends.</p>
+      <div class="row"><a class="btn warm" data-link="shop" href="#coffee">Shop the coffee</a><a class="btn line" href="#help">Find the roastery</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="pair" id="coffee">
+  <div class="wrap">
+    <figure class="shot"><img data-slot="featured" src="frames/f_0462.webp" alt="A cup of freshly brewed coffee with crema" loading="lazy" width="1920" height="1080"></figure>
+    <div>
+      <p class="eyebrow">The house coffee</p>
+      <h2><span class="ph">name your everyday coffee here</span></h2>
+      <p><span class="ph">Say who it is for and how it tastes: the body, the acidity, the notes people find in the cup.</span></p>
+      <a class="btn warm" data-link="shop" href="#coffee">Shop the coffee</a>
+    </div>
+  </div>
+</section>
+
+<section class="pair alt flip" id="subscribe">
+  <div class="wrap">
+    <figure class="shot"><img data-slot="subscription" src="frames/f_0175.webp" alt="Green coffee beans drying" loading="lazy" width="1920" height="1080"></figure>
+    <div>
+      <p class="eyebrow">Subscribe and save</p>
+      <h2>fresh coffee, on a schedule</h2>
+      <p><span class="ph">Explain your subscription: choose a coffee, choose how often, roasted fresh each time, and what the saving is.</span></p>
+      <a class="btn line" data-link="subscribe" href="#subscribe">Start a subscription</a>
+    </div>
+  </div>
+</section>
+
+<section class="voices" id="voices">
+  <div class="wrap">
+    <h2>what people say</h2>
+    <p class="slot">Your customer reviews go here. Connect the reviews widget you already use so the stars and comments shown are the real ones.</p>
+  </div>
+</section>
+
+<section class="faq" id="help">
+  <div class="wrap">
+    <div>
+      <h2>F.A.Q.</h2>
+      <details><summary>What makes your coffee different?</summary><p><span class="ph">Add your answer.</span></p></details>
+      <details><summary>I usually drink instant coffee. Where should I start?</summary><p><span class="ph">Add your answer.</span></p></details>
+      <details><summary>Do I need special equipment to brew it?</summary><p><span class="ph">Add your answer.</span></p></details>
+      <details><summary>How long does delivery take?</summary><p><span class="ph">Add your answer.</span></p></details>
+      <details><summary>What if I don't like the coffee?</summary><p><span class="ph">Add your answer.</span></p></details>
+    </div>
+    <aside class="help">
+      <h3>Still have questions?</h3>
+      <p>Reach out and we'll get back to you.</p>
+      <a class="btn warm" data-link="contact" href="#help">Contact us</a>
+      <ul>
+        <li><span class="ph" data-shop="email">Add your email</span></li>
+        <li><span class="ph" data-shop="phone">Add your phone or WhatsApp</span></li>
+        <li><span class="ph" data-shop="hours">Add your opening hours</span></li>
+        <li><span class="ph" data-shop="address">Add your roastery address</span></li>
+      </ul>
+    </aside>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="wordmark" href="#journey"><span data-shop="name">your roastery</span></a>
+        <p class="tag"><span class="ph" data-shop="tagline">Add your tagline</span></p>
+      </div>
+      <div><h3>Shop</h3><ul><li><a data-link="shop" href="#coffee">Coffees</a></li><li><a data-link="subscribe" href="#subscribe">Subscriptions</a></li><li><a href="#roastery">Visit the roastery</a></li></ul></div>
+      <div><h3>Learn</h3><ul><li><a href="#journey">The journey</a></li><li><a href="#story">Our story</a></li><li><a href="#help">F.A.Q.</a></li></ul></div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <form class="news" id="news" novalidate>
+          <input id="news-email" type="email" autocomplete="email" placeholder="Enter your email" aria-label="Email address">
+          <button class="btn warm" type="submit">Subscribe</button>
+        </form>
+        <p class="news-note" id="news-note" role="status"></p>
+      </div>
+    </div>
+    <div class="fine">
+      <p>&copy; <span data-shop="name">your roastery</span>. Film made in Blender. Coffee bean model: &ldquo;Coffee bean - PBR&rdquo; by fervinas, used under a Creative Commons Attribution licence.</p>
+      <p>Template: the name, logo, photos, text with a dashed underline, reviews and contact details are still to be added.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(() => {
+  /* ================= YOUR DETAILS: fill these in =================
+     Leave a value empty to keep the placeholder. Image paths are relative to this file. */
+  const SHOP = {
+    name: '', logo: '', tagline: '',
+    email: '', phone: '', hours: '', address: '',
+    links: { shop: '', subscribe: '', contact: '' },
+    images: { featured: 'images/featured.webp', subscription: 'images/subscription.webp' },
+    alts: { featured: 'A bag of coffee laid out on a wooden table with a takeaway cup, roasted beans, a portafilter and a tasting card', subscription: 'Two bags of coffee, one large and one small, standing among scattered roasted beans' }
+  };
+  document.querySelectorAll('[data-shop]').forEach(el => { const v = SHOP[el.dataset.shop]; if (v) { el.textContent = v; el.classList.remove('ph'); } });
+  document.querySelectorAll('[data-link]').forEach(el => { const v = SHOP.links[el.dataset.link]; if (v) el.href = v; });
+  document.querySelectorAll('img[data-slot]').forEach(el => { const v = SHOP.images[el.dataset.slot]; if (v) { el.src = v; el.alt = SHOP.alts[el.dataset.slot] || ''; } });
+  if (SHOP.logo) document.querySelectorAll('.wordmark').forEach(a => { const im = new Image(); im.src = SHOP.logo; im.alt = SHOP.name || 'Home'; a.textContent = ''; a.appendChild(im); });
+  document.getElementById('news').addEventListener('submit', e => { e.preventDefault(); document.getElementById('news-note').textContent = 'This form is not connected to a mailing list yet.'; });
+
+  const N = 480, ENDS = [80, 150, 200, 320, 380, 468];           // last frame shown while each stage's block passes
+  const COLORS = ['--st-cherry', '--st-pulp', '--st-dry', '--st-roast', '--st-grind', '--st-brew'];
+  /* 1 = the film is a full scene, 0 = it is a single subject on black. Keyed by frame. */
+  const MODE_F = [0, 64, 76, 149, 158, 322, 335, 403, 414, 480], MODE_V = [1, 1, 0, 0, 1, 1, 0, 0, 1, 1];
+  /* where the subject sits in the frame, and how far out it reaches, during the object shots: [frame, x, y, reach] */
+  const SUBJ = [[64,.5,.5,.48],[76,.56,.53,.30],[80,.566,.61,.30],[84,.566,.65,.30],[88,.566,.636,.30],[92,.567,.577,.32],[96,.55,.50,.38],[100,.53,.47,.44],[112,.51,.46,.44],[118,.497,.50,.44],[128,.494,.486,.44],[158,.493,.47,.44],
+    [322,.565,.47,.46],[334,.563,.475,.46],[338,.50,.44,.44],[345,.47,.44,.43],[380,.486,.42,.41],[386,.47,.40,.39],[392,.5,.38,.37],[398,.5,.45,.44],[404,.5,.5,.46],[414,.5,.5,.46]];
+  const SF = SUBJ.map(r => r[0]), SX = SUBJ.map(r => r[1]), SY = SUBJ.map(r => r[2]), SR = SUBJ.map(r => r[3]);
+
+  const journey = document.getElementById('journey'), floater = document.getElementById('floater');
+  const canvas = document.getElementById('film'), ctx = canvas.getContext('2d');
+  const oc = document.createElement('canvas'), octx = oc.getContext('2d');
+  const heroB = document.getElementById('b-hero'), finB = document.getElementById('b-fin'), chB = [...journey.querySelectorAll('.block.ch')];
+  const loading = document.getElementById('loading'), readout = document.getElementById('readout');
+  const rk = readout.querySelector('.k'), rv = readout.querySelector('.v'), rf = readout.querySelector('.flag');
+  const sl = document.getElementById('sl'), sr = document.getElementById('sr'), sb = document.getElementById('sb');
+  const svg = document.getElementById('trail'), tp0 = document.getElementById('tp0'), tp1 = document.getElementById('tp1'), tcr = document.getElementById('tcr'), tg = document.getElementById('tg');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches, narrow = matchMedia('(max-width: 760px)');
+
+  /* ---- frames: load the ones nearest the current position first ---- */
+  const imgs = new Array(N), asked = new Uint8Array(N);
+  let loaded = 0, want = 0, inFlight = 0, last = null;
+  const url = i => `frames/f_${String(i + 1).padStart(4, '0')}.webp`;
+  function nextIndex() { for (let d = 0; d < N; d++) { const a = want + d, b = want - d; if (a < N && !asked[a]) return a; if (b >= 0 && !asked[b]) return b; } return -1; }
+  function pump() {
+    while (inFlight < 8) {
+      const i = nextIndex(); if (i < 0) return;
+      asked[i] = 1; inFlight++;
+      const im = new Image(); im.decoding = 'async';
+      im.onload = () => { imgs[i] = im; loaded++; inFlight--; loading.textContent = `Loading film ${Math.round(loaded / N * 100)}%`; if (loaded >= N) loading.classList.add('done'); if (last && Math.abs(i - want) < 4) render(last); pump(); };
+      im.onerror = () => { inFlight--; pump(); };
+      im.src = url(i);
+    }
+  }
+  function nearest(i) { for (let d = 0; d < N; d++) { if (imgs[i - d]) return i - d; if (imgs[i + d]) return i + d; } return -1; }
+
+  const clamp = (x, a, b) => Math.min(Math.max(x, a), b), lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+  const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  function pick(xs, ys, x, ease) {
+    if (x <= xs[0]) return ys[0];
+    for (let i = 1; i < xs.length; i++) if (x <= xs[i]) { let t = (x - xs[i - 1]) / Math.max(xs[i] - xs[i - 1], 1e-6); if (ease) t = smooth(t); return ys[i - 1] + (ys[i] - ys[i - 1]) * t; }
+    return ys[ys.length - 1];
+  }
+  let M = null;
+  function layout() {
+    const vw = journey.clientWidth, vh = floater.offsetHeight || window.innerHeight, mobile = narrow.matches;
+    const pad = parseFloat(getComputedStyle(heroB).paddingLeft) || 16;
+    const hObj = mobile ? Math.min(1.09 * vw, 0.5 * vh) : 0.86 * vh;                   // on-screen height of the frame while it is an object
+    const mid = el => el.offsetTop + el.offsetHeight / 2, bot = el => el.offsetTop + el.offsetHeight;
+    M = { vw, vh, mobile, hObj, refY: vh / 2, yObj: mobile ? 0.3 * vh : vh / 2, H: journey.offsetHeight, span: Math.max(journey.offsetHeight - vh, 1),
+      amp: mobile ? 0 : Math.max(0, Math.min(vw * 0.24, vw / 2 - 0.42 * hObj - pad * 0.5)),
+      uX: [mid(heroB), ...chB.map(mid)], uY: [0, 0, 1, 2, 3, 4, 5],
+      fX: [vh / 2, ...chB.map(bot), mid(finB)], fY: [1, ...ENDS, N],
+      g0: bot(chB[5]), g1: mid(finB),
+      dpr: clamp(Math.min(window.devicePixelRatio || 1, 1920 / vw), 1, 2) };
+    const cw = Math.round(vw * M.dpr), ch = Math.round(vh * M.dpr);
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = oc.width = cw; canvas.height = oc.height = ch; }
+    if (!mobile) buildTrail();
+  }
+  function at(s) {                               // s = pixels scrolled into the journey
+    const yc = s + M.refY, u = pick(M.uX, M.uY, yc), f = pick(M.fX, M.fY, yc);
+    const e = pick(MODE_F, MODE_V, f, true), S = Math.sin(Math.PI / 2 * Math.cos(Math.PI * u));
+    const cy = pick(SF, SY, f);
+    return { f, e, S, g: smooth((yc - M.g0) / Math.max(M.g1 - M.g0, 1)), x: M.amp * S * (1 - e), cx: pick(SF, SX, f), cy, rm: Math.min(pick(SF, SR, f), Math.min(cy, 1 - cy) - 0.015) };
+  }
+  function buildTrail() {
+    svg.setAttribute('viewBox', `0 0 ${M.vw} ${M.H}`);
+    let d = '';
+    for (let s = 0; s <= M.span; s += 16) { const p = at(s); d += (s ? 'L' : 'M') + (M.vw / 2 + p.x).toFixed(1) + ' ' + (s + M.yObj).toFixed(1); }
+    tp0.setAttribute('d', d); tp1.setAttribute('d', d);
+    tg.setAttribute('y2', M.H); tcr.setAttribute('width', M.vw);
+    const cs = getComputedStyle(document.documentElement);
+    tg.innerHTML = chB.map((el, i) => `<stop offset="${((el.offsetTop + el.offsetHeight / 2) / M.H).toFixed(4)}" stop-color="${cs.getPropertyValue(COLORS[i]).trim()}"/>`).join('');
+  }
+  /* ---- one frame, drawn as a full scene, as a lone subject, or part-way between ---- */
+  function render(st) {
+    const i = nearest(want); if (i < 0) return;
+    floater.classList.add('live');
+    const im = imgs[i], iw = im.naturalWidth, ih = im.naturalHeight, { vw, vh, dpr } = M, e = st.e;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, vw, vh);
+    const scS = Math.max(vw / iw, vh / ih), aS = smooth((e - 0.2) / 0.8);
+    if (aS > 0.002) { ctx.globalAlpha = aS; ctx.drawImage(im, (vw - iw * scS) / 2, (vh - ih * scS) / 2, iw * scS, ih * scS); ctx.globalAlpha = 1; }
+    const aO = 1 - smooth(e / 0.85);
+    if (aO > 0.002) {
+      const scO = M.hObj / ih, sc = scO * Math.pow(scS / scO, e);
+      const ax = lerp(st.cx, 0.5, e), ay = lerp(st.cy, 0.5, e), tx = vw / 2 + st.x, ty = lerp(M.yObj, vh / 2, e);
+      const r1 = st.rm * ih * sc, r0 = r1 * 0.5;
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.globalCompositeOperation = 'source-over'; octx.clearRect(0, 0, vw, vh);
+      octx.drawImage(im, tx - ax * iw * sc, ty - ay * ih * sc, iw * sc, ih * sc);
+      const gr = octx.createRadialGradient(tx, ty, r0, tx, ty, r1);
+      gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.35, 'rgba(0,0,0,0.84)'); gr.addColorStop(0.65, 'rgba(0,0,0,0.42)'); gr.addColorStop(0.86, 'rgba(0,0,0,0.11)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      octx.globalCompositeOperation = 'destination-in'; octx.fillStyle = gr; octx.fillRect(0, 0, vw, vh);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = aO; ctx.drawImage(oc, 0, 0); ctx.globalAlpha = 1;
+    }
+  }
+  function info(f) {
+    if (f <= 80) return ['Harvest', 'Ripe only', ''];
+    if (f <= 150) return ['Pulping', 'Fruit off, bean out', ''];
+    if (f <= 200) return ['Moisture', Math.round(lerp(55, 11, (f - 151) / 49)) + '%', f > 196 ? 'Ready to store' : ''];
+    if (f <= 320) { const t = f < 273 ? lerp(150, 196, (f - 201) / 72) : lerp(196, 212, (f - 273) / 47); return ['Drum', Math.round(t) + ' °C', f >= 270 ? 'First crack' : '']; }
+    if (f <= 380) return ['Grind', 'Fine, for espresso', ''];
+    return ['Shot', Math.round(lerp(0, 27, (f - 411) / 35)) + ' s', f >= 446 ? 'Done' : (f >= 411 ? 'Pouring' : '')];
+  }
+  function apply(p) {
+    if (!M) return;
+    const s = clamp(p, 0, 1) * M.span, st = at(s), f = Math.round(st.f);
+    last = st; want = clamp(f - 1, 0, N - 1); render(st); pump();
+    const wL = (1 + st.S) / 2;
+    if (M.mobile) { sl.style.opacity = 0; sr.style.opacity = 0; sb.style.opacity = st.e.toFixed(3); }
+    else { sl.style.opacity = (st.e * wL * (1 - st.g)).toFixed(3); sr.style.opacity = (st.e * (1 - wL) * (1 - st.g)).toFixed(3); sb.style.opacity = (st.e * st.g).toFixed(3);
+      readout.style.opacity = (1 - st.g).toFixed(3); svg.style.opacity = (1 - st.e).toFixed(3); tcr.setAttribute('height', (s + M.yObj).toFixed(1)); }
+    const [k, v, flag] = info(f); if (rk.textContent !== k) rk.textContent = k; if (rv.textContent !== v) rv.textContent = v; if (rf.textContent !== flag) rf.textContent = flag;
+  }
+  const scrollP = () => clamp(-journey.getBoundingClientRect().top / M.span, 0, 1);
+
+  layout();
+  let cur = () => scrollP();
+  if (window.gsap && window.ScrollTrigger) {
+    gsap.registerPlugin(ScrollTrigger);
+    const st = { p: 0 }; cur = () => st.p;
+    gsap.to(st, { p: 1, ease: 'none', onUpdate: () => apply(st.p),
+      scrollTrigger: { trigger: journey, start: 'top top', end: 'bottom bottom', scrub: reduced ? true : 0.7, invalidateOnRefresh: true } });
+    if (!reduced) gsap.from('.hero .copy > *', { y: 24, opacity: 0, duration: 1.1, ease: 'power3.out', stagger: 0.12, delay: 0.15 });
+  } else {
+    let tick = false;
+    addEventListener('scroll', () => { if (!tick) { tick = true; requestAnimationFrame(() => { tick = false; apply(scrollP()); }); } }, { passive: true });
+  }
+  let rz = 0;
+  new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { layout(); apply(cur()); }); }).observe(journey);
+  apply(scrollP());
+})();
+</script>
+
+</body></html>
