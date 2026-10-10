@@ -382,7 +382,7 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
       const i = nextIndex(); if (i < 0) return;
       asked[i] = 1; inFlight++;
       const im = new Image(); im.decoding = 'async';
-      im.onload = () => { imgs[i] = im; loaded++; inFlight--; loading.textContent = `Loading film ${Math.round(loaded / N * 100)}%`; if (loaded >= N) loading.classList.add('done'); if (last && Math.abs(i - want) < 4) render(last); pump(); };
+      im.onload = () => { imgs[i] = im; loaded++; inFlight--; loading.textContent = `Loading film ${Math.round(loaded / N * 100)}%`; if (loaded >= N) loading.classList.add('done'); if (last && Math.abs(i - want) < 24) decodeWindow(); if (last && !bm.size && Math.abs(i - want) < 4) render(last); pump(); };
       im.onerror = () => { inFlight--; pump(); };
       im.src = url(i);
     }
@@ -407,16 +407,16 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
       uX: [mid(heroB), ...chB.map(mid)], uY: [0, 0, 1, 2, 3, 4, 5],
       fX: [vh / 2, ...chB.map(bot), mid(finB)], fY: [1, ...ENDS, N],
       g0: bot(chB[5]), g1: mid(finB),
-      dpr: clamp(Math.min(window.devicePixelRatio || 1, 1920 / vw), 1, 2) };
+      dpr: clamp(Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(4.4e6 / (vw * vh))), 1, 2) };
     const cw = Math.round(vw * M.dpr), ch = Math.round(vh * M.dpr);
     if (canvas.width !== cw || canvas.height !== ch) { canvas.width = oc.width = cw; canvas.height = oc.height = ch; }
     if (!mobile) buildTrail();
   }
   function at(s) {                               // s = pixels scrolled into the journey
     const yc = s + M.refY, u = pick(M.uX, M.uY, yc), f = pick(M.fX, M.fY, yc);
-    const e = pick(MODE_F, MODE_V, f, true), S = Math.sin(Math.PI / 2 * Math.cos(Math.PI * u));
+    const e = pick(MODE_F, MODE_V, f, true), eg = smooth(e / 0.55), S = Math.sin(Math.PI / 2 * Math.cos(Math.PI * u));
     const cy = pick(SF, SY, f);
-    return { f, e, S, g: smooth((yc - M.g0) / Math.max(M.g1 - M.g0, 1)), x: M.amp * S * (1 - e), cx: pick(SF, SX, f), cy, rm: Math.min(pick(SF, SR, f), Math.min(cy, 1 - cy) - 0.015) };
+    return { f, e, eg, S, g: smooth((yc - M.g0) / Math.max(M.g1 - M.g0, 1)), x: M.amp * S * (1 - eg), cx: pick(SF, SX, f), cy, rm: Math.min(pick(SF, SR, f), Math.min(cy, 1 - cy) - 0.015) };
   }
   function buildTrail() {
     svg.setAttribute('viewBox', `0 0 ${M.vw} ${M.H}`);
@@ -427,25 +427,44 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
     const cs = getComputedStyle(document.documentElement);
     tg.innerHTML = chB.map((el, i) => `<stop offset="${((el.offsetTop + el.offsetHeight / 2) / M.H).toFixed(4)}" stop-color="${cs.getPropertyValue(COLORS[i]).trim()}"/>`).join('');
   }
-  /* ---- one frame, drawn as a full scene, as a lone subject, or part-way between ---- */
+  /* ---- frames near the current one are decoded ahead of time, so drawing never has to wait ---- */
+  const bm = new Map(), pend = new Set(); let dir = 1, lastWant = 0;
+  function decodeWindow() {
+    if (!window.createImageBitmap || !M) return;
+    const back = dir > 0 ? 8 : 20, fwd = dir > 0 ? 20 : 8;
+    for (let i = Math.max(0, want - back); i <= Math.min(N - 1, want + fwd); i++) {
+      if (!imgs[i] || bm.has(i) || pend.has(i)) continue;
+      pend.add(i);
+      (M.mobile ? createImageBitmap(imgs[i], { resizeWidth: 960, resizeHeight: 540, resizeQuality: 'high' }) : createImageBitmap(imgs[i]))
+        .then(b => { pend.delete(i); if (Math.abs(i - want) > 34) { b.close(); return; } bm.set(i, b); if (last && Math.abs(i - want) < 3) render(last); })
+        .catch(() => pend.delete(i));
+    }
+    for (const [k, b] of bm) if (k < want - 34 || k > want + 34) { b.close(); bm.delete(k); }
+  }
+  function source() {
+    for (let d = 0; d <= 6; d++) { if (bm.has(want - d)) return bm.get(want - d); if (bm.has(want + d)) return bm.get(want + d); }
+    const i = nearest(want); return i < 0 ? null : imgs[i];
+  }
+  /* ---- one frame, drawn as a full scene, as a lone subject, or part-way between ----
+     The subject first grows into the scene's own position, and only then does the rest of the scene fade in around it,
+     so wherever the scroll stops there is one clean picture, never two overlapping ones. */
   function render(st) {
-    const i = nearest(want); if (i < 0) return;
+    const im = source(); if (!im) return;
     floater.classList.add('live');
-    const im = imgs[i], iw = im.naturalWidth, ih = im.naturalHeight, { vw, vh, dpr } = M, e = st.e;
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height, { vw, vh, dpr } = M, e = st.e, eg = st.eg;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.clearRect(0, 0, vw, vh);
-    const scS = Math.max(vw / iw, vh / ih), aS = smooth((e - 0.2) / 0.8);
+    const scS = Math.max(vw / iw, vh / ih), aS = smooth((e - 0.5) / 0.5);
     if (aS > 0.002) { ctx.globalAlpha = aS; ctx.drawImage(im, (vw - iw * scS) / 2, (vh - ih * scS) / 2, iw * scS, ih * scS); ctx.globalAlpha = 1; }
-    const aO = 1 - smooth(e / 0.85);
-    if (aO > 0.002) {
-      const scO = M.hObj / ih, sc = scO * Math.pow(scS / scO, e);
-      const ax = lerp(st.cx, 0.5, e), ay = lerp(st.cy, 0.5, e), tx = vw / 2 + st.x, ty = lerp(M.yObj, vh / 2, e);
-      const r1 = st.rm * ih * sc, r0 = r1 * 0.5;
+    if (aS < 0.998) {
+      const scO = M.hObj / ih, sc = scO * Math.pow(scS / scO, eg);
+      const ax = lerp(st.cx, 0.5, eg), ay = lerp(st.cy, 0.5, eg), tx = vw / 2 + st.x, ty = lerp(M.yObj, vh / 2, eg);
+      const r1 = lerp(st.rm, 0.485, eg) * ih * sc, r0 = r1 * 0.5;
       octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.globalCompositeOperation = 'source-over'; octx.clearRect(0, 0, vw, vh);
       octx.drawImage(im, tx - ax * iw * sc, ty - ay * ih * sc, iw * sc, ih * sc);
       const gr = octx.createRadialGradient(tx, ty, r0, tx, ty, r1);
       gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.35, 'rgba(0,0,0,0.84)'); gr.addColorStop(0.65, 'rgba(0,0,0,0.42)'); gr.addColorStop(0.86, 'rgba(0,0,0,0.11)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
       octx.globalCompositeOperation = 'destination-in'; octx.fillStyle = gr; octx.fillRect(0, 0, vw, vh);
-      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = aO; ctx.drawImage(oc, 0, 0); ctx.globalAlpha = 1;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(oc, 0, 0);
     }
   }
   function info(f) {
@@ -459,7 +478,7 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
   function apply(p) {
     if (!M) return;
     const s = clamp(p, 0, 1) * M.span, st = at(s), f = Math.round(st.f);
-    last = st; want = clamp(f - 1, 0, N - 1); render(st); pump();
+    last = st; want = clamp(f - 1, 0, N - 1); dir = Math.sign(want - lastWant) || dir; lastWant = want; render(st); decodeWindow(); pump();
     const wL = (1 + st.S) / 2;
     if (M.mobile) { sl.style.opacity = 0; sr.style.opacity = 0; sb.style.opacity = st.e.toFixed(3); }
     else { sl.style.opacity = (st.e * wL * (1 - st.g)).toFixed(3); sr.style.opacity = (st.e * (1 - wL) * (1 - st.g)).toFixed(3); sb.style.opacity = (st.e * st.g).toFixed(3);
@@ -474,7 +493,7 @@ footer .tag { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--muted); }
     gsap.registerPlugin(ScrollTrigger);
     const st = { p: 0 }; cur = () => st.p;
     gsap.to(st, { p: 1, ease: 'none', onUpdate: () => apply(st.p),
-      scrollTrigger: { trigger: journey, start: 'top top', end: 'bottom bottom', scrub: reduced ? true : 0.7, invalidateOnRefresh: true } });
+      scrollTrigger: { trigger: journey, start: 'top top', end: 'bottom bottom', scrub: reduced ? true : 0.3, invalidateOnRefresh: true } });
     if (!reduced) gsap.from('.hero .copy > *', { y: 24, opacity: 0, duration: 1.1, ease: 'power3.out', stagger: 0.12, delay: 0.15 });
   } else {
     let tick = false;
